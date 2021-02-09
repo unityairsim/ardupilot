@@ -84,14 +84,6 @@ void AirSim::send_servos(const struct sitl_input &input)
     pkt.direction = 0;
     pkt.turbulence = 0;
 
-    if (pkt.pwm[0] > 1000) {
-        //printf("motor speed: %i\n", pkt.pwm[0]);
-        // pkt.pwm[0] = 1500;//input.servos[2];
-        // pkt.pwm[1] = 1500;//input.servos[3];
-        // pkt.pwm[2] = 1500 + i;//input.servos[1];
-        // pkt.pwm[3] = 1500 + i++;
-    }
-
 	ssize_t send_ret = sock.sendto(&pkt, sizeof(pkt), airsim_ip, airsim_control_port);
 	if (send_ret != sizeof(pkt)) {
 		if (send_ret <= 0) {
@@ -116,7 +108,7 @@ struct SensorMessage {
         uint64_t timestamp;
         double latitude, longitude; // degrees
         double altitude;  // MSL
-        double heading;   // degrees
+        Vector3f heading;   // degrees
         double speedN, speedE, speedD; // m/s
         double xAccel, yAccel, zAccel;       // m/s/s in body frame
         double rollRate, pitchRate, yawRate; // degrees/s/s in earth frame
@@ -132,7 +124,7 @@ void AirSim::recv_fdm()
     // Receive sensor packet
     ssize_t ret = sock.recv(&sensor_buffer[sensor_buffer_len], sizeof(sensor_buffer)-sensor_buffer_len, 100);
     while (ret <= 0) {
-        //printf("No sensor message received - %s\n", strerror(errno));
+        printf("No sensor message received - %s\n", strerror(errno));
         ret = sock.recv(&sensor_buffer[sensor_buffer_len], sizeof(sensor_buffer)-sensor_buffer_len, 100);
     }
     // mark edit
@@ -140,18 +132,14 @@ void AirSim::recv_fdm()
     if (ret > 0) {
         memcpy(&packet, &sensor_buffer[sensor_buffer_len], ret);
     }
-    //printf("sensor message: %f, %f, %f\n\n", packet.rollRate, packet.pitchRate, packet.yawRate);
-    // end edit
 
-    AP_Baro *barometer = AP_Baro::get_singleton();
-    barometer->get_altitude();
     accel_body = Vector3f(packet.xAccel,// state.imu.linear_acceleration[0],
-                          -packet.yAccel,// state.imu.linear_acceleration[1],
+                          packet.yAccel,// state.imu.linear_acceleration[1],
                           packet.zAccel);// state.imu.linear_acceleration[2]);
 
     gyro = Vector3f(packet.rollRate,// state.imu.angular_velocity[0],
                     packet.pitchRate,// state.imu.angular_velocity[1],
-                    -packet.yawRate);// state.imu.angular_velocity[2]);
+                    packet.yawRate);// state.imu.angular_velocity[2]);
 
     velocity_ef = Vector3f(packet.speedN,// state.velocity.world_linear_velocity[0],
                            packet.speedE,// state.velocity.world_linear_velocity[1],
@@ -163,9 +151,9 @@ void AirSim::recv_fdm()
     fractpart = modf(packet.longitude, &intpart);
     location.lng = ((int)intpart * 1.0e7) + (int)(fractpart * 1.0e7);//state.gps.lon * 1.0e7;
     location.alt = (double)packet.altitude * 100;// state.gps.alt * 100.0f;
-    // gcs().send_text(MAV_SEVERITY_INFO, "GPS location = %d, %d, %d", location.lat, location.lng, location.alt);
+    //gcs().send_text(MAV_SEVERITY_INFO, "GPS location = %d, %d, %d", location.lat, location.lng, location.alt);
 
-    dcm.from_euler(packet.rollDeg, packet.pitchDeg, -packet.yawDeg);// state.pose.roll, state.pose.pitch, state.pose.yaw);
+    dcm.from_euler(packet.rollDeg, packet.pitchDeg, packet.yawDeg);// state.pose.roll, state.pose.pitch, state.pose.yaw);
 
     if (last_timestamp) {
         int deltat = packet.timestamp - last_timestamp;// state.timestamp - last_timestamp;
@@ -178,13 +166,6 @@ void AirSim::recv_fdm()
             average_frame_time = average_frame_time * 0.98 + deltat * 0.02;
         }
     }
-
-    //scanner.points = state.lidar.points;
-
-    // rcin_chan_count = state.rc.rc_channels.length < 8 ? state.rc.rc_channels.length : 8;
-    // for (uint8_t i=0; i < rcin_chan_count; i++) {
-    //     rcin[i] = state.rc.rc_channels.data[i];
-    // }
 
     last_timestamp = packet.timestamp;//state.timestamp;
 }
