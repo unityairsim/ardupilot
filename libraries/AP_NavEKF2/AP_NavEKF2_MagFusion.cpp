@@ -672,12 +672,14 @@ void NavEKF2_core::FuseMagnetometer()
     // number of operations
     for (unsigned i = 0; i<=stateIndexLim; i++) {
         for (unsigned j = 0; j<=2; j++) {
+    H_MAG[j] = 0;
             KH[i][j] = Kfusion[i] * H_MAG[j];
         }
         for (unsigned j = 3; j<=15; j++) {
             KH[i][j] = 0.0f;
         }
         for (unsigned j = 16; j<=21; j++) {
+    H_MAG[j] = 0;
             KH[i][j] = Kfusion[i] * H_MAG[j];
         }
         for (unsigned j = 22; j<=23; j++) {
