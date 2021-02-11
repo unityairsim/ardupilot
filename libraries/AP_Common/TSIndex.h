@@ -27,7 +27,7 @@
 template <class base_type, class tag> class typesafe_index
 {
 public:
-    explicit typesafe_index(base_type i = base_type()) : p(i) {}
+    explicit typesafe_index(base_type f = base_type()) : p(f) {}
 
     void operator=(const base_type& val)
     {
